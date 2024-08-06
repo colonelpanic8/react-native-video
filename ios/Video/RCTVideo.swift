@@ -114,6 +114,7 @@ class RCTVideo: UIView, RCTVideoPlayerViewControllerDelegate, RCTPlayerObserverH
     @objc var onVideoProgress: RCTDirectEventBlock?
     @objc var onVideoBandwidthUpdate: RCTDirectEventBlock?
     @objc var onVideoSeek: RCTDirectEventBlock?
+    @objc var onVideoSeekComplete: RCTDirectEventBlock?
     @objc var onVideoEnd: RCTDirectEventBlock?
     @objc var onTimedMetadata: RCTDirectEventBlock?
     @objc var onVideoAudioBecomingNoisy: RCTDirectEventBlock?
@@ -764,28 +765,32 @@ class RCTVideo: UIView, RCTVideoPlayerViewControllerDelegate, RCTPlayerObserverH
     @objc
     func setSeek(_ time: NSNumber, _ tolerance: NSNumber) {
         let item: AVPlayerItem? = _player?.currentItem
-
-        _pendingSeek = true
-
         guard item != nil, let player = _player, let item, item.status == AVPlayerItem.Status.readyToPlay else {
+            _pendingSeek = true
             _pendingSeekTime = time.floatValue
             return
         }
+        let wasPaused = _paused
 
-        RCTPlayerOperations.seek(
-            player: player,
-            playerItem: item,
-            paused: _paused,
-            seekTime: time.floatValue,
-            seekTolerance: tolerance.floatValue
-        ) { [weak self] (_: Bool) in
-            guard let self else { return }
+        let seekTime = CMTimeMakeWithSeconds(Float64(time.floatValue), preferredTimescale: Int32(NSEC_PER_SEC))
+        let toleranceTime = CMTimeMakeWithSeconds(Float64(tolerance.floatValue), preferredTimescale: Int32(NSEC_PER_SEC))
+
+        player.seek(to: seekTime, toleranceBefore: toleranceTime, toleranceAfter: toleranceTime) { [weak self] (finished) in
+            guard let self = self, finished else { return }
 
             self._playerObserver.addTimeObserverIfNotSet()
-            self.setPaused(self._paused)
-            self.onVideoSeek?(["currentTime": NSNumber(value: Float(CMTimeGetSeconds(item.currentTime()))),
+            if !wasPaused {
+                self.setPaused(false)
+            }
+
+            let currentTime = NSNumber(value: Float(CMTimeGetSeconds(item.currentTime())))
+            self.onVideoSeek?(["currentTime": currentTime,
                                "seekTime": time,
                                "target": self.reactTag])
+
+            self.onVideoSeekComplete?(["currentTime": currentTime,
+                                       "seekTime": time,
+                                       "target": self.reactTag])
         }
 
         _pendingSeek = false

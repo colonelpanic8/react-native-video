@@ -12,6 +12,7 @@ import type {
   OnPlaybackStateChangedData,
   OnProgressData,
   OnSeekData,
+  OnSeekCompleteData,
   OnTextTrackDataChangedData,
   OnTimedMetadataData,
   OnVideoAspectRatioData,
@@ -258,6 +259,7 @@ export interface ReactVideoEvents {
   onReceiveAdEvent?: (e: OnReceiveAdEventData) => void; //Android, iOS
   onRestoreUserInterfaceForPictureInPictureStop?: () => void; //iOS
   onSeek?: (e: OnSeekData) => void; //Android, iOS, Windows UWP
+  onSeekComplete?: (e: OnSeekCompleteData) => void; // iOS
   onPlaybackStateChanged?: (e: OnPlaybackStateChangedData) => void; // Android, iOS
   onTimedMetadata?: (e: OnTimedMetadataData) => void; //Android, iOS
   onAudioTracks?: (e: OnAudioTracksData) => void; // Android

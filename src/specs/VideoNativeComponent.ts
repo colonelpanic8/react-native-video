@@ -182,6 +182,12 @@ export type OnSeekData = Readonly<{
   seekTime: Float;
 }>;
 
+export type OnSeekCompleteData = Readonly<{
+  currentTime: number;
+  seekTime: number;
+  target: number;
+}>;
+
 export type OnPlaybackStateChangedData = Readonly<{
   isPlaying: boolean;
   isSeeking: boolean;
@@ -349,6 +355,7 @@ export interface VideoNativeProps extends ViewProps {
   onVideoProgress?: DirectEventHandler<OnProgressData>;
   onVideoBandwidthUpdate?: DirectEventHandler<OnBandwidthUpdateData>;
   onVideoSeek?: DirectEventHandler<OnSeekData>;
+  onVideoSeekComplete?: DirectEventHandler<OnSeekCompleteData>;
   onVideoEnd?: DirectEventHandler<{}>; // all
   onVideoAudioBecomingNoisy?: DirectEventHandler<{}>;
   onVideoFullscreenPlayerWillPresent?: DirectEventHandler<{}>; // ios, android
