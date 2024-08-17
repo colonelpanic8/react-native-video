@@ -23,6 +23,7 @@ import android.os.IBinder;
 import android.os.Looper;
 import android.os.Message;
 import android.text.TextUtils;
+import android.util.Log;
 import android.view.View;
 import android.view.Window;
 import android.view.accessibility.CaptioningManager;
@@ -302,6 +303,15 @@ public class ReactExoplayerView extends FrameLayout implements
             }
         }
     };
+
+    private void handleSeekCompletion() {
+        if (player != null && player.getPlaybackState() == Player.STATE_READY) {
+            Log.d("ReactExoplayerView", "onSeekComplete triggered. Current position: " + player.getCurrentPosition());
+            eventEmitter.onSeekComplete.invoke(player.getCurrentPosition());
+            isSeeking = false;
+            seekPosition = -1;
+        }
+    }
 
     public double getPositionInFirstPeriodMsForCurrentWindow(long currentPosition) {
         Timeline.Window window = new Timeline.Window();
@@ -761,7 +771,8 @@ public class ReactExoplayerView extends FrameLayout implements
                 .setBandwidthMeter(bandwidthMeter)
                 .setLoadControl(loadControl)
                 .setMediaSourceFactory(mediaSourceFactory)
-                .build();
+            .build();
+        player.addListener(self);
         ReactNativeVideoManager.Companion.getInstance().onInstanceCreated(instanceId, player);
         refreshDebugState();
         player.addListener(self);
@@ -1371,6 +1382,7 @@ public class ReactExoplayerView extends FrameLayout implements
                         playerControlView.show();
                     }
                     setKeepScreenOn(preventsDisplaySleepDuringVideoPlayback);
+                    handleSeekCompletion();
                     break;
                 case Player.STATE_ENDED:
                     text += "ended";
@@ -2137,6 +2149,8 @@ public class ReactExoplayerView extends FrameLayout implements
 
     public void seekTo(long positionMs) {
         if (player != null) {
+            isSeeking = true;
+            seekPosition = positionMs;
             player.seekTo(positionMs);
         }
     }
