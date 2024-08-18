@@ -306,9 +306,9 @@ public class ReactExoplayerView extends FrameLayout implements
     };
 
     private void handleSeekCompletion() {
-        if (player != null && player.getPlaybackState() == Player.STATE_READY) {
-            Log.d("ReactExoplayerView", "onSeekComplete triggered. Current position: " + player.getCurrentPosition());
-            eventEmitter.onVideoSeekComplete.invoke(player.getCurrentPosition());
+        if (player != null && player.getPlaybackState() == Player.STATE_READY && isSeekInProgress) {
+            Log.d("ReactExoplayerView", "handleSeekCompletion: currentPosition=" + player.getCurrentPosition());
+            eventEmitter.onSeekComplete.invoke(player.getCurrentPosition());
             isSeeking = false;
             seekPosition = -1;
             isSeekInProgress = false;
@@ -1351,6 +1351,7 @@ public class ReactExoplayerView extends FrameLayout implements
         if (events.contains(Player.EVENT_PLAYBACK_STATE_CHANGED) || events.contains(Player.EVENT_PLAY_WHEN_READY_CHANGED)) {
             int playbackState = player.getPlaybackState();
             boolean playWhenReady = player.getPlayWhenReady();
+            Log.d("ReactExoplayerView", "onEvents: playbackState=" + playbackState + ", playWhenReady=" + playWhenReady);
             String text = "onStateChanged: playWhenReady=" + playWhenReady + ", playbackState=";
             eventEmitter.onPlaybackRateChange.invoke(playWhenReady && playbackState == ExoPlayer.STATE_READY ? 1.0f : 0.0f);
             switch (playbackState) {
@@ -1384,6 +1385,7 @@ public class ReactExoplayerView extends FrameLayout implements
                         playerControlView.show();
                     }
                     setKeepScreenOn(preventsDisplaySleepDuringVideoPlayback);
+                    Log.d("ReactExoplayerView", "Player STATE_READY: currentPosition=" + player.getCurrentPosition());
                     if (isSeekInProgress) {
                         handleSeekCompletion();
                     }
@@ -1650,6 +1652,7 @@ public class ReactExoplayerView extends FrameLayout implements
 
     @Override
     public void onPositionDiscontinuity(@NonNull Player.PositionInfo oldPosition, @NonNull Player.PositionInfo newPosition, @Player.DiscontinuityReason int reason) {
+        Log.d("ReactExoplayerView", "onPositionDiscontinuity: reason=" + reason + ", oldPosition=" + oldPosition.positionMs + ", newPosition=" + newPosition.positionMs);
         if (reason == Player.DISCONTINUITY_REASON_SEEK) {
             isSeeking = true;
             seekPosition = newPosition.positionMs;
@@ -2153,6 +2156,7 @@ public class ReactExoplayerView extends FrameLayout implements
 
     public void seekTo(long positionMs) {
         if (player != null) {
+            Log.d("ReactExoplayerView", "seekTo: positionMs=" + positionMs);
             isSeekInProgress = true;
             isSeeking = true;
             seekPosition = positionMs;
