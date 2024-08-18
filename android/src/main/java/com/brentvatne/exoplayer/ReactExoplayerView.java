@@ -308,7 +308,7 @@ public class ReactExoplayerView extends FrameLayout implements
     private void handleSeekCompletion() {
         if (player != null && player.getPlaybackState() == Player.STATE_READY && isSeekInProgress) {
             Log.d("ReactExoplayerView", "handleSeekCompletion: currentPosition=" + player.getCurrentPosition());
-            eventEmitter.onSeekComplete.invoke(player.getCurrentPosition());
+            eventEmitter.onVideoSeekComplete.invoke(player.getCurrentPosition());
             isSeeking = false;
             seekPosition = -1;
             isSeekInProgress = false;
