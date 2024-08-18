@@ -229,6 +229,7 @@ public class ReactExoplayerView extends FrameLayout implements
     */
     private boolean isSeeking = false;
     private long seekPosition = -1;
+    private boolean isSeekInProgress = false;
 
     // Props from React
     private Source source = new Source();
@@ -310,6 +311,7 @@ public class ReactExoplayerView extends FrameLayout implements
             eventEmitter.onVideoSeekComplete.invoke(player.getCurrentPosition());
             isSeeking = false;
             seekPosition = -1;
+            isSeekInProgress = false;
         }
     }
 
@@ -1382,7 +1384,9 @@ public class ReactExoplayerView extends FrameLayout implements
                         playerControlView.show();
                     }
                     setKeepScreenOn(preventsDisplaySleepDuringVideoPlayback);
-                    handleSeekCompletion();
+                    if (isSeekInProgress) {
+                        handleSeekCompletion();
+                    }
                     break;
                 case Player.STATE_ENDED:
                     text += "ended";
@@ -2149,6 +2153,7 @@ public class ReactExoplayerView extends FrameLayout implements
 
     public void seekTo(long positionMs) {
         if (player != null) {
+            isSeekInProgress = true;
             isSeeking = true;
             seekPosition = positionMs;
             player.seekTo(positionMs);
