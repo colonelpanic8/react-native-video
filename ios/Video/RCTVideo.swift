@@ -762,6 +762,7 @@ class RCTVideo: UIView, RCTVideoPlayerViewControllerDelegate, RCTPlayerObserverH
         _paused = paused
     }
 
+
     @objc
     func setSeek(_ time: NSNumber, _ tolerance: NSNumber) {
         let item: AVPlayerItem? = _player?.currentItem
@@ -770,30 +771,44 @@ class RCTVideo: UIView, RCTVideoPlayerViewControllerDelegate, RCTPlayerObserverH
             _pendingSeekTime = time.floatValue
             return
         }
-        let wasPaused = _paused
 
+        let wasPaused = _paused
         let seekTime = CMTimeMakeWithSeconds(Float64(time.floatValue), preferredTimescale: Int32(NSEC_PER_SEC))
         let toleranceTime = CMTimeMakeWithSeconds(Float64(tolerance.floatValue), preferredTimescale: Int32(NSEC_PER_SEC))
 
-        player.seek(to: seekTime, toleranceBefore: toleranceTime, toleranceAfter: toleranceTime) { [weak self] (finished) in
-            guard let self = self, finished else { return }
+        let currentTimeBeforeSeek = CMTimeGetSeconds(item.currentTime())
+
+        // Call onVideoSeek before starting the seek operation
+        let currentTime = NSNumber(value: Float(currentTimeBeforeSeek))
+        self.onVideoSeek?(["currentTime": currentTime,
+                        "seekTime": time,
+                        "target": self.reactTag])
+
+        _pendingSeek = true
+
+        let seekCompletionHandler: (Bool) -> Void = { [weak self] finished in
+            guard let self = self else { return }
+
+            self._pendingSeek = false
+
+            guard finished else {
+                return
+            }
 
             self._playerObserver.addTimeObserverIfNotSet()
             if !wasPaused {
                 self.setPaused(false)
             }
 
-            let currentTime = NSNumber(value: Float(CMTimeGetSeconds(item.currentTime())))
-            self.onVideoSeek?(["currentTime": currentTime,
-                               "seekTime": time,
-                               "target": self.reactTag])
+            let currentTimeAfterSeek = CMTimeGetSeconds(item.currentTime())
 
-            self.onVideoSeekComplete?(["currentTime": currentTime,
-                                       "seekTime": time,
-                                       "target": self.reactTag])
+            let newCurrentTime = NSNumber(value: Float(currentTimeAfterSeek))
+            self.onVideoSeekComplete?(["currentTime": newCurrentTime,
+                                    "seekTime": time,
+                                    "target": self.reactTag])
         }
 
-        _pendingSeek = false
+        player.seek(to: seekTime, toleranceBefore: toleranceTime, toleranceAfter: toleranceTime, completionHandler: seekCompletionHandler)
     }
 
     @objc
@@ -1661,3 +1676,4 @@ class RCTVideo: UIView, RCTVideoPlayerViewControllerDelegate, RCTPlayerObserverH
     @objc
     func setOnClick(_: Any) {}
 }
+
