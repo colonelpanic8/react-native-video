@@ -22,6 +22,7 @@ enum class EventTypes(val eventName: String) {
     EVENT_BANDWIDTH("onVideoBandwidthUpdate"),
     EVENT_CONTROLS_VISIBILITY_CHANGE("onControlsVisibilityChange"),
     EVENT_SEEK("onVideoSeek"),
+    EVENT_SEEK_COMPLETE("onVideoSeekComplete"),
     EVENT_END("onVideoEnd"),
     EVENT_FULLSCREEN_WILL_PRESENT("onVideoFullscreenPlayerWillPresent"),
     EVENT_FULLSCREEN_DID_PRESENT("onVideoFullscreenPlayerDidPresent"),
@@ -71,6 +72,7 @@ class VideoEventEmitter {
     lateinit var onVideoBandwidthUpdate: (bitRateEstimate: Long, height: Int, width: Int, trackId: String) -> Unit
     lateinit var onVideoPlaybackStateChanged: (isPlaying: Boolean, isSeeking: Boolean) -> Unit
     lateinit var onVideoSeek: (currentPosition: Long, seekTime: Long) -> Unit
+    lateinit var onVideoSeekComplete: (currentPosition: Long) -> Unit
     lateinit var onVideoEnd: () -> Unit
     lateinit var onVideoFullscreenPlayerWillPresent: () -> Unit
     lateinit var onVideoFullscreenPlayerDidPresent: () -> Unit
@@ -168,6 +170,11 @@ class VideoEventEmitter {
                 event.dispatch(EventTypes.EVENT_SEEK) {
                     putDouble("currentTime", currentPosition / 1000.0)
                     putDouble("seekTime", seekTime / 1000.0)
+                }
+            }
+            onVideoSeekComplete = { currentPosition ->
+                event.dispatch(EventTypes.EVENT_SEEK_COMPLETE) {
+                    putDouble("currentTime", currentPosition / 1000.0)
                 }
             }
             onVideoEnd = {
