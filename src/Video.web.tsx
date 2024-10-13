@@ -6,7 +6,7 @@ import React, {
   useRef,
   type RefObject,
 } from 'react';
-import shaka from 'shaka-player/dist/shaka-player.ui';
+import shaka from 'shaka-player';
 import type { VideoRef, ReactVideoProps, VideoMetadata } from './types';
 
 const Video = forwardRef<VideoRef, ReactVideoProps>(
@@ -52,7 +52,6 @@ const Video = forwardRef<VideoRef, ReactVideoProps>(
           0,
           Math.min(time, shakaPlayerRef.current.seekRange().end)
         );
-        shakaPlayerRef.current.seek(time);
         onSeek?.({
           seekTime: time,
           currentTime: nativeRef.current?.currentTime || 0,
@@ -224,7 +223,8 @@ const Video = forwardRef<VideoRef, ReactVideoProps>(
       shakaPlayerRef.current = player;
 
       // Error handling
-      player.addEventListener('error', (event: shaka.Event) => {
+      player.addEventListener('error', (event) => {
+        //@ts-ignore
         const shakaError = event.detail;
         console.error('Shaka Player Error', shakaError);
         onError?.({
@@ -236,12 +236,14 @@ const Video = forwardRef<VideoRef, ReactVideoProps>(
       });
 
       // Buffering events
-      player.addEventListener('buffering', (event: shaka.Event) => {
+      player.addEventListener('buffering', (event) => {
+        //@ts-ignore
         onBuffer?.({ isBuffering: event.buffering });
       });
 
       // Load the video source
       player
+        //@ts-ignore
         .load(source?.uri)
         .then(() => {
           // Media loaded successfully
@@ -262,8 +264,11 @@ const Video = forwardRef<VideoRef, ReactVideoProps>(
             duration,
             //@ts-ignore
             naturalSize,
+            //@ts-ignore
             videoTracks: player.getVariantTracks(),
+            //@ts-ignore
             audioTracks: player.getVariantTracks(),
+            //@ts-ignore
             textTracks: player.getTextTracks(),
           });
 
