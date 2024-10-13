@@ -32,6 +32,7 @@ import type {
   OnPlaybackStateChangedData,
   OnProgressData,
   OnSeekData,
+  OnSeekCompleteData,
   OnTextTrackDataChangedData,
   OnTimedMetadataData,
   OnVideoAspectRatioData,
@@ -97,6 +98,7 @@ const Video = forwardRef<VideoRef, ReactVideoProps>(
       onError,
       onProgress,
       onSeek,
+      onSeekComplete,
       onEnd,
       onBuffer,
       onBandwidthUpdate,
@@ -469,6 +471,13 @@ const Video = forwardRef<VideoRef, ReactVideoProps>(
       [onSeek],
     );
 
+    const onVideoSeekComplete = useCallback(
+      (e: NativeSyntheticEvent<OnSeekCompleteData>) => {
+        onSeekComplete?.(e.nativeEvent);
+      },
+      [onSeekComplete]
+    );
+
     const onVideoPlaybackStateChanged = useCallback(
       (e: NativeSyntheticEvent<OnPlaybackStateChangedData>) => {
         onPlaybackStateChanged?.(e.nativeEvent);
@@ -811,6 +820,7 @@ const Video = forwardRef<VideoRef, ReactVideoProps>(
           onVideoError={onError ? onVideoError : undefined}
           onVideoProgress={onProgress ? onVideoProgress : undefined}
           onVideoSeek={onSeek ? onVideoSeek : undefined}
+          onVideoSeekComplete={onSeekComplete ? onVideoSeekComplete : undefined}
           onVideoEnd={onEnd}
           onVideoBuffer={onBuffer ? onVideoBuffer : undefined}
           onVideoPlaybackStateChanged={
