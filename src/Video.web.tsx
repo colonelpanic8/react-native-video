@@ -14,7 +14,7 @@ const Video = forwardRef<VideoRef, ReactVideoProps>(
     {
       source,
       paused,
-      muted,
+      // muted,
       volume,
       rate,
       repeat,
@@ -241,7 +241,7 @@ const Video = forwardRef<VideoRef, ReactVideoProps>(
         onBuffer?.({ isBuffering: event.buffering });
       });
 
-      player.attach(mediaElement)
+      // player.attach(mediaElement)
 
       // Load the video source
       player
