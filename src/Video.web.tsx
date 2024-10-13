@@ -6,7 +6,7 @@ import React, {
   useRef,
   type RefObject,
 } from 'react';
-import shaka from 'shaka-player';
+import shaka from 'shaka-player/ui';
 import type { VideoRef, ReactVideoProps, VideoMetadata } from './types';
 
 const Video = forwardRef<VideoRef, ReactVideoProps>(
