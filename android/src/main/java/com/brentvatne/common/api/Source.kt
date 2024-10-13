@@ -14,6 +14,7 @@ import com.brentvatne.common.toolbox.ReactBridgeUtils.safeGetBool
 import com.brentvatne.common.toolbox.ReactBridgeUtils.safeGetInt
 import com.brentvatne.common.toolbox.ReactBridgeUtils.safeGetMap
 import com.brentvatne.common.toolbox.ReactBridgeUtils.safeGetString
+import com.brentvatne.react.BuildConfig
 import com.facebook.react.bridge.ReadableMap
 import java.util.Locale
 import java.util.Objects
@@ -38,6 +39,9 @@ class Source {
     /** Will crop content end at specified position */
     var cropEndMs: Int = -1
 
+    /** Will virtually consider that content before contentStartTime is a preroll ad */
+    var contentStartTime: Int = -1
+
     /** Allow to force stream content, necessary when uri doesn't contain content type (.mlp4, .m3u, ...) */
     var extension: String? = null
 
@@ -57,6 +61,21 @@ class Source {
      */
     var textTracksAllowChunklessPreparation: Boolean = false
 
+    /**
+     * CMCD properties linked to the source
+     */
+    var cmcdProps: CMCDProps? = null
+
+    /**
+     * Ads playback properties
+     */
+    var adsProps: AdsProps? = null
+
+    /**
+     * The list of sideLoaded text tracks
+     */
+    var sideLoadedTextTracks: SideLoadedTextTrackList? = null
+
     override fun hashCode(): Int = Objects.hash(uriString, uri, startPositionMs, cropStartMs, cropEndMs, extension, metadata, headers)
 
     /** return true if this and src are equals  */
@@ -68,7 +87,11 @@ class Source {
                 cropEndMs == other.cropEndMs &&
                 startPositionMs == other.startPositionMs &&
                 extension == other.extension &&
-                drmProps == other.drmProps
+                drmProps == other.drmProps &&
+                contentStartTime == other.contentStartTime &&
+                cmcdProps == other.cmcdProps &&
+                sideLoadedTextTracks == other.sideLoadedTextTracks &&
+                adsProps == other.adsProps
             )
     }
 
@@ -127,11 +150,15 @@ class Source {
         private const val PROP_SRC_START_POSITION = "startPosition"
         private const val PROP_SRC_CROP_START = "cropStart"
         private const val PROP_SRC_CROP_END = "cropEnd"
+        private const val PROP_SRC_CONTENT_START_TIME = "contentStartTime"
         private const val PROP_SRC_TYPE = "type"
         private const val PROP_SRC_METADATA = "metadata"
         private const val PROP_SRC_HEADERS = "requestHeaders"
         private const val PROP_SRC_DRM = "drm"
+        private const val PROP_SRC_CMCD = "cmcd"
+        private const val PROP_SRC_ADS = "ad"
         private const val PROP_SRC_TEXT_TRACKS_ALLOW_CHUNKLESS_PREPARATION = "textTracksAllowChunklessPreparation"
+        private const val PROP_SRC_TEXT_TRACKS = "textTracks"
 
         @SuppressLint("DiscouragedApi")
         private fun getUriFromAssetId(context: Context, uriString: String): Uri? {
@@ -187,9 +214,15 @@ class Source {
                 source.startPositionMs = safeGetInt(src, PROP_SRC_START_POSITION, -1)
                 source.cropStartMs = safeGetInt(src, PROP_SRC_CROP_START, -1)
                 source.cropEndMs = safeGetInt(src, PROP_SRC_CROP_END, -1)
+                source.contentStartTime = safeGetInt(src, PROP_SRC_CONTENT_START_TIME, -1)
                 source.extension = safeGetString(src, PROP_SRC_TYPE, null)
                 source.drmProps = parse(safeGetMap(src, PROP_SRC_DRM))
+                source.cmcdProps = CMCDProps.parse(safeGetMap(src, PROP_SRC_CMCD))
+                if (BuildConfig.USE_EXOPLAYER_IMA) {
+                    source.adsProps = AdsProps.parse(safeGetMap(src, PROP_SRC_ADS))
+                }
                 source.textTracksAllowChunklessPreparation = safeGetBool(src, PROP_SRC_TEXT_TRACKS_ALLOW_CHUNKLESS_PREPARATION, true)
+                source.sideLoadedTextTracks = SideLoadedTextTrackList.parse(safeGetArray(src, PROP_SRC_TEXT_TRACKS))
 
                 val propSrcHeadersArray = safeGetArray(src, PROP_SRC_HEADERS)
                 if (propSrcHeadersArray != null) {

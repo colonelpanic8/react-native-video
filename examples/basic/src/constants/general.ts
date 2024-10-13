@@ -2,13 +2,19 @@ import {
   BufferConfig,
   DRMType,
   ISO639_1,
+  SelectedTrackType,
   TextTrackType,
 } from 'react-native-video';
 import {SampleVideoSource} from '../types';
 import {localeVideo} from '../assets';
 import {Platform} from 'react-native';
 
-export const textTracksSelectionBy = 'index';
+// This constant allows to change how the sample behaves regarding to audio and texts selection.
+// You can change it to change how selector will use tracks information.
+// by default, index will be displayed and index will be applied to selected tracks.
+// You can also use LANGUAGE or TITLE
+export const textTracksSelectionBy = SelectedTrackType.INDEX;
+export const audioTracksSelectionBy = SelectedTrackType.INDEX;
 
 export const isIos = Platform.OS === 'ios';
 
@@ -24,6 +30,10 @@ export const srcAllPlatformList = [
     uri: localeVideo.broadchurch,
     cropStart: 3000,
     cropEnd: 10000,
+  },
+  {
+    description: 'video with 90° rotation',
+    uri: 'https://bn-dev.fra1.digitaloceanspaces.com/km-tournament/uploads/rn_image_picker_lib_temp_2ee86a27_9312_4548_84af_7fd75d9ad4dd_ad8b20587a.mp4',
   },
   {
     description: 'local file portrait',
@@ -87,6 +97,11 @@ export const srcAllPlatformList = [
     startPosition: 50000,
   },
   {
+    description: 'mp3 with texttrack',
+    uri: 'https://traffic.libsyn.com/democracynow/wx2024-0702_SOT_DeadCalm-LucileSmith-FULL-V2.mxf-audio.mp3', // an mp3 file
+    textTracks: [], // empty text track list
+  },
+  {
     description: 'BigBugBunny sideLoaded subtitles',
     // sideloaded subtitles wont work for streaming like HLS on ios
     // mp4
@@ -100,11 +115,19 @@ export const srcAllPlatformList = [
       },
     ],
   },
+  {
+    description: '(mp4) big buck bunny With Ads',
+    ad: {
+      adTagUrl:
+        'https://pubads.g.doubleclick.net/gampad/ads?iu=/21775744923/external/vmap_ad_samples&sz=640x480&cust_params=sample_ar%3Dpremidpostoptimizedpodbumper&ciu_szs=300x250&gdfp_req=1&ad_rule=1&output=vmap&unviewed_position_start=1&env=vp&impl=s&cmsid=496&vid=short_onecue&correlator=',
+      },
+    uri: 'https://d23dyxeqlo5psv.cloudfront.net/big_buck_bunny.mp4',
+  },
 ];
 
-export const srcIosList = [];
+export const srcIosList: SampleVideoSource[] = [];
 
-export const srcAndroidList = [
+export const srcAndroidList: SampleVideoSource[] = [
   {
     description: 'Another live sample',
     uri: 'https://live.forstreet.cl/live/livestream.m3u8',
@@ -125,12 +148,6 @@ export const srcAndroidList = [
     description: '(mp4|subtitles) demo with sintel Subtitles',
     uri: 'http://www.youtube.com/api/manifest/dash/id/bf5bb2419360daf1/source/youtube?as=fmp4_audio_clear,fmp4_sd_hd_clear&sparams=ip,ipbits,expire,source,id,as&ip=0.0.0.0&ipbits=0&expire=19000000000&signature=51AF5F39AB0CEC3E5497CD9C900EBFEAECCCB5C7.8506521BFC350652163895D4C26DEE124209AA9E&key=ik0',
     type: 'mpd',
-  },
-  {
-    description: '(mp4) big buck bunny With Ads',
-    adTagUrl:
-      'https://pubads.g.doubleclick.net/gampad/ads?iu=/21775744923/external/vmap_ad_samples&sz=640x480&cust_params=sample_ar%3Dpremidpostoptimizedpodbumper&ciu_szs=300x250&gdfp_req=1&ad_rule=1&output=vmap&unviewed_position_start=1&env=vp&impl=s&cmsid=496&vid=short_onecue&correlator=',
-    uri: 'http://d23dyxeqlo5psv.cloudfront.net/big_buck_bunny.mp4',
   },
   {
     description: 'WV: Secure SD & HD (cbcs,MP4,H264)',
@@ -157,13 +174,12 @@ export const srcAndroidList = [
   },
 ];
 
-// poster which can be displayed
-export const samplePoster =
-  'https://upload.wikimedia.org/wikipedia/commons/1/18/React_Native_Logo.png';
+const platformSrc: SampleVideoSource[] = isAndroid
+  ? srcAndroidList
+  : srcIosList;
 
-export const srcList: SampleVideoSource[] = srcAllPlatformList.concat(
-  isAndroid ? srcAndroidList : srcIosList,
-);
+export const srcList: SampleVideoSource[] =
+  platformSrc.concat(srcAllPlatformList);
 
 export const bufferConfig: BufferConfig = {
   minBufferMs: 15000,
