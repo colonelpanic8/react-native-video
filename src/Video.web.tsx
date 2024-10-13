@@ -241,6 +241,8 @@ const Video = forwardRef<VideoRef, ReactVideoProps>(
         onBuffer?.({ isBuffering: event.buffering });
       });
 
+      player.attach(mediaElement)
+
       // Load the video source
       player
         //@ts-ignore
@@ -294,7 +296,7 @@ const Video = forwardRef<VideoRef, ReactVideoProps>(
     return (
       <video
         ref={nativeRef}
-        muted={muted}
+        muted={true}
         controls={controls}
         loop={repeat}
         playsInline
