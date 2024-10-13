@@ -229,6 +229,7 @@ const Video = forwardRef<VideoRef, ReactVideoProps>(
 
     useEffect(() => {
       if (!nativeRef.current || rate === undefined) {
+        console.log("Not starting shaka yet bc undefined")
         return;
       }
       if (shakaPlayerRef.current) {
@@ -246,13 +247,14 @@ const Video = forwardRef<VideoRef, ReactVideoProps>(
           },
         });
       });
+      console.log("Initializing and attaching shaka")
       shakaPlayerRef.current.attach(nativeRef.current, true);
-      if (source) {
-        //@ts-ignore
-        shakaPlayerRef.current.load(source?.uri).then(
-          () => console.log(`${source?.uri} finished loading`)
-        );
-      }
+
+      //@ts-ignore
+      shakaPlayerRef.current.load(source?.uri).then(
+        () => console.log(`${source?.uri} finished loading`)
+      );
+      console.log("STarted shaka loading");
     }, [source])
 
     useMediaSession(source?.metadata, nativeRef, showNotificationControls);
