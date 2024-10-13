@@ -6,7 +6,7 @@ import React, {
   useRef,
   type RefObject,
 } from 'react';
-import shaka from 'shaka-player/dist/shaka-player.compiled.js';
+import shaka from 'shaka-player/dist/shaka-player.ui';
 import type { VideoRef, ReactVideoProps, VideoMetadata } from './types';
 
 const Video = forwardRef<VideoRef, ReactVideoProps>(
@@ -27,20 +27,17 @@ const Video = forwardRef<VideoRef, ReactVideoProps>(
       onBuffer,
       onLoad,
       onProgress,
-      onPlaybackRateChange,
+      // onPlaybackRateChange,
       onError,
       onReadyForDisplay,
       onSeek,
-      onVolumeChange,
+      // onVolumeChange,
       onEnd,
-      onPlaybackStateChanged,
     },
     ref,
   ) => {
     const nativeRef = useRef<HTMLVideoElement>(null);
     const shakaPlayerRef = useRef<shaka.Player | null>(null);
-
-    const isSeeking = useRef(false);
 
     const seek = useCallback(
       (time: number, _tolerance?: number) => {
@@ -227,7 +224,7 @@ const Video = forwardRef<VideoRef, ReactVideoProps>(
       shakaPlayerRef.current = player;
 
       // Error handling
-      player.addEventListener('error', (event) => {
+      player.addEventListener('error', (event: shaka.Event) => {
         const shakaError = event.detail;
         console.error('Shaka Player Error', shakaError);
         onError?.({
@@ -239,7 +236,7 @@ const Video = forwardRef<VideoRef, ReactVideoProps>(
       });
 
       // Buffering events
-      player.addEventListener('buffering', (event) => {
+      player.addEventListener('buffering', (event: shaka.Event) => {
         onBuffer?.({ isBuffering: event.buffering });
       });
 
@@ -263,6 +260,7 @@ const Video = forwardRef<VideoRef, ReactVideoProps>(
           onLoad?.({
             currentTime: nativeRef.current.currentTime,
             duration,
+            //@ts-ignore
             naturalSize,
             videoTracks: player.getVariantTracks(),
             audioTracks: player.getVariantTracks(),
@@ -271,7 +269,7 @@ const Video = forwardRef<VideoRef, ReactVideoProps>(
 
           onReadyForDisplay?.();
         })
-        .catch((error) => {
+        .catch((error: any) => {
           console.error('Error loading video', error);
           onError?.({ error });
         });
