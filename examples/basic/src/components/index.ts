@@ -1,3 +1,4 @@
+export * from './VideoLoader';
 export * from './Indicator';
 export * from './Seeker';
 export * from './AudioTracksSelector';
@@ -6,3 +7,5 @@ export * from './TextTracksSelector';
 export * from './Overlay';
 export * from './TopControl';
 export * from './Toast';
+export * from './ToggleControl';
+export * from './MultiValueControl';

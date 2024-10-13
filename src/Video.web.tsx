@@ -236,6 +236,7 @@ const Video = forwardRef<VideoRef, ReactVideoProps>(
         controls={controls}
         loop={repeat}
         playsInline
+        //@ts-ignore
         poster={poster}
         onCanPlay={() => onBuffer?.({isBuffering: false})}
         onWaiting={() => onBuffer?.({isBuffering: true})}
