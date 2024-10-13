@@ -6,7 +6,8 @@ import React, {
   useRef,
   type RefObject,
 } from 'react';
-import type {VideoRef, ReactVideoProps, VideoMetadata} from './types';
+import shaka from 'shaka-player/dist/shaka-player.compiled.js';
+import type { VideoRef, ReactVideoProps, VideoMetadata } from './types';
 
 const Video = forwardRef<VideoRef, ReactVideoProps>(
   (
@@ -37,20 +38,28 @@ const Video = forwardRef<VideoRef, ReactVideoProps>(
     ref,
   ) => {
     const nativeRef = useRef<HTMLVideoElement>(null);
+    const shakaPlayerRef = useRef<shaka.Player | null>(null);
 
     const isSeeking = useRef(false);
+
     const seek = useCallback(
-      async (time: number, _tolerance?: number) => {
+      (time: number, _tolerance?: number) => {
         if (isNaN(time)) {
           throw new Error('Specified time is not a number');
         }
-        if (!nativeRef.current) {
-          console.warn('Video Component is not mounted');
+        if (!shakaPlayerRef.current) {
+          console.warn('Shaka Player is not initialized');
           return;
         }
-        time = Math.max(0, Math.min(time, nativeRef.current.duration));
-        nativeRef.current.currentTime = time;
-        onSeek?.({seekTime: time, currentTime: nativeRef.current.currentTime});
+        time = Math.max(
+          0,
+          Math.min(time, shakaPlayerRef.current.seekRange().end)
+        );
+        shakaPlayerRef.current.seek(time);
+        onSeek?.({
+          seekTime: time,
+          currentTime: nativeRef.current?.currentTime || 0,
+        });
       },
       [onSeek],
     );
@@ -198,26 +207,7 @@ const Video = forwardRef<VideoRef, ReactVideoProps>(
       setVolume(volume);
     }, [volume, setVolume]);
 
-    // we use a ref to prevent triggerring the useEffect when the component rerender with a non-stable `onPlaybackStateChanged`.
-    const playbackStateRef = useRef(onPlaybackStateChanged);
-    playbackStateRef.current = onPlaybackStateChanged;
-    useEffect(() => {
-      // Not sure about how to do this but we want to wait for nativeRef to be initialized
-      setTimeout(() => {
-        if (!nativeRef.current) {
-          return;
-        }
-
-        // Set play state to the player's value (if autoplay is denied)
-        // This is useful if our UI is in a play state but autoplay got denied so
-        // the video is actaully in a paused state.
-        playbackStateRef.current?.({
-          isPlaying: !nativeRef.current.paused,
-          isSeeking: isSeeking.current,
-        });
-      }, 500);
-    }, []);
-
+    // Handle playback rate changes
     useEffect(() => {
       if (!nativeRef.current || rate === undefined) {
         return;
@@ -225,46 +215,90 @@ const Video = forwardRef<VideoRef, ReactVideoProps>(
       nativeRef.current.playbackRate = rate;
     }, [rate]);
 
+    // Initialize Shaka Player
+    useEffect(() => {
+      if (!nativeRef.current) {
+        console.warn('Video component is not mounted');
+        return;
+      }
+
+      // Initialize Shaka Player
+      const player = new shaka.Player(nativeRef.current);
+      shakaPlayerRef.current = player;
+
+      // Error handling
+      player.addEventListener('error', (event) => {
+        const shakaError = event.detail;
+        console.error('Shaka Player Error', shakaError);
+        onError?.({
+          error: {
+            errorString: shakaError.message,
+            code: shakaError.code,
+          },
+        });
+      });
+
+      // Buffering events
+      player.addEventListener('buffering', (event) => {
+        onBuffer?.({ isBuffering: event.buffering });
+      });
+
+      // Load the video source
+      player
+        .load(source?.uri)
+        .then(() => {
+          // Media loaded successfully
+          if (!nativeRef.current) return;
+
+          const duration = nativeRef.current.duration;
+          const naturalSize = {
+            width: nativeRef.current.videoWidth,
+            height: nativeRef.current.videoHeight,
+            orientation:
+              nativeRef.current.videoWidth > nativeRef.current.videoHeight
+                ? 'landscape'
+                : 'portrait',
+          };
+
+          onLoad?.({
+            currentTime: nativeRef.current.currentTime,
+            duration,
+            naturalSize,
+            videoTracks: player.getVariantTracks(),
+            audioTracks: player.getVariantTracks(),
+            textTracks: player.getTextTracks(),
+          });
+
+          onReadyForDisplay?.();
+        })
+        .catch((error) => {
+          console.error('Error loading video', error);
+          onError?.({ error });
+        });
+
+      return () => {
+        // Cleanup
+        if (shakaPlayerRef.current) {
+          shakaPlayerRef.current.destroy();
+          shakaPlayerRef.current = null;
+        }
+      };
+    }, [source?.uri]);
+
+    // Handle Media Session (if implemented)
     useMediaSession(source?.metadata, nativeRef, showNotificationControls);
 
     return (
       <video
         ref={nativeRef}
-        src={source?.uri as string | undefined}
         muted={muted}
-        autoPlay={!paused}
         controls={controls}
         loop={repeat}
         playsInline
         //@ts-ignore
         poster={poster}
-        onCanPlay={() => onBuffer?.({isBuffering: false})}
-        onWaiting={() => onBuffer?.({isBuffering: true})}
-        onRateChange={() => {
-          if (!nativeRef.current) {
-            return;
-          }
-          onPlaybackRateChange?.({
-            playbackRate: nativeRef.current?.playbackRate,
-          });
-        }}
-        onDurationChange={() => {
-          if (!nativeRef.current) {
-            return;
-          }
-          onLoad?.({
-            currentTime: nativeRef.current.currentTime,
-            duration: nativeRef.current.duration,
-            videoTracks: [],
-            textTracks: [],
-            audioTracks: [],
-            naturalSize: {
-              width: nativeRef.current.videoWidth,
-              height: nativeRef.current.videoHeight,
-              orientation: 'landscape',
-            },
-          });
-        }}
+        onCanPlay={() => onBuffer?.({ isBuffering: false })}
+        onWaiting={() => onBuffer?.({ isBuffering: true })}
         onTimeUpdate={() => {
           if (!nativeRef.current) {
             return;
@@ -273,54 +307,33 @@ const Video = forwardRef<VideoRef, ReactVideoProps>(
             currentTime: nativeRef.current.currentTime,
             playableDuration: nativeRef.current.buffered.length
               ? nativeRef.current.buffered.end(
-                  nativeRef.current.buffered.length - 1,
+                  nativeRef.current.buffered.length - 1
                 )
               : 0,
-            seekableDuration: 0,
+            seekableDuration: nativeRef.current.seekable.length
+              ? nativeRef.current.seekable.end(
+                  nativeRef.current.seekable.length - 1
+                )
+              : 0,
           });
         }}
-        onLoadedData={() => onReadyForDisplay?.()}
+        onEnded={onEnd}
         onError={() => {
           if (!nativeRef.current?.error) {
             return;
           }
           onError?.({
             error: {
-              errorString: nativeRef.current.error.message ?? 'Unknown error',
+              errorString:
+                nativeRef.current.error.message || 'Unknown error',
               code: nativeRef.current.error.code,
             },
           });
         }}
-        onLoadedMetadata={() => {
-          if (source?.startPosition) {
-            seek(source.startPosition / 1000);
-          }
-        }}
-        onPlay={() =>
-          onPlaybackStateChanged?.({
-            isPlaying: true,
-            isSeeking: isSeeking.current,
-          })
-        }
-        onPause={() =>
-          onPlaybackStateChanged?.({
-            isPlaying: false,
-            isSeeking: isSeeking.current,
-          })
-        }
-        onSeeking={() => (isSeeking.current = true)}
-        onSeeked={() => (isSeeking.current = false)}
-        onVolumeChange={() => {
-          if (!nativeRef.current) {
-            return;
-          }
-          onVolumeChange?.({volume: nativeRef.current.volume});
-        }}
-        onEnded={onEnd}
         style={videoStyle}
       />
     );
-  },
+  }
 );
 
 const videoStyle = {
