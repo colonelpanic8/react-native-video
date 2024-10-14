@@ -6,6 +6,7 @@ import React, {
   useRef,
   type RefObject,
 } from 'react';
+//@ts-ignore
 import shaka from 'shaka-player';
 import type {VideoRef, ReactVideoProps, VideoMetadata} from './types';
 
@@ -236,6 +237,7 @@ const Video = forwardRef<VideoRef, ReactVideoProps>(
         shakaPlayerRef.current.unload()
       }
       shakaPlayerRef.current = new shaka.Player();
+      //@ts-ignore
       shakaPlayerRef.current.addEventListener("error", (event) => {
         //@ts-ignore
         const shakaError = event.detail;
