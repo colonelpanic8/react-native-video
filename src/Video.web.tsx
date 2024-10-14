@@ -228,7 +228,7 @@ const Video = forwardRef<VideoRef, ReactVideoProps>(
     }, [rate]);
 
     useEffect(() => {
-      if (!nativeRef.current || rate === undefined) {
+      if (!nativeRef.current) {
         console.log("Not starting shaka yet bc undefined")
         return;
       }
