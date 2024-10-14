@@ -254,8 +254,8 @@ const Video = forwardRef<VideoRef, ReactVideoProps>(
       shakaPlayerRef.current.load(source?.uri).then(
         () => console.log(`${source?.uri} finished loading`)
       );
-      console.log("STarted shaka loading");
-    }, [source])
+      console.log("Started shaka loading");
+    }, [source, nativeRef.current])
 
     useMediaSession(source?.metadata, nativeRef, showNotificationControls);
 
