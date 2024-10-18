@@ -23,9 +23,11 @@ class ActionQueue {
 
   private async runNext() {
     if (this.isRunning || this.queue.length === 0) {
+      console.log("Refusing to run in runNext", this.queue.length, this.isRunning);
       return;
     }
     this.isRunning = true;
+    console.log("Running an action");
     const action = this.queue.shift();
     if (action) {
       try {
