@@ -11,6 +11,35 @@ import React, {
 import shaka from 'shaka-player';
 import type {VideoRef, ReactVideoProps, VideoMetadata} from './types';
 
+// Action Queue Class
+class ActionQueue {
+  private queue: (() => Promise<void>)[] = [];
+  private isRunning = false;
+
+  enqueue(action: () => Promise<void>) {
+    this.queue.push(action);
+    this.runNext();
+  }
+
+  private async runNext() {
+    if (this.isRunning || this.queue.length === 0) {
+      return;
+    }
+    this.isRunning = true;
+    const action = this.queue.shift();
+    if (action) {
+      try {
+        await action();
+      } catch (e) {
+        console.error('Error in queued action:', e);
+      } finally {
+        this.isRunning = false;
+        this.runNext();
+      }
+    }
+  }
+}
+
 function shallowEqual(obj1: any, obj2: any) {
   // If both are strictly equal (covers primitive types and identical object references)
   if (obj1 === obj2) return true;
@@ -64,44 +93,61 @@ const Video = forwardRef<VideoRef, ReactVideoProps>(
   ) => {
     const nativeRef = useRef<HTMLVideoElement>(null);
     const shakaPlayerRef = useRef<shaka.Player | null>(null);
-    const [ currentSource, setCurrentSource ] = useState<object | null>(null);
+    const [currentSource, setCurrentSource] = useState<object | null>(null);
+    const actionQueue = useRef(new ActionQueue());
 
     const isSeeking = useRef(false);
+
     const seek = useCallback(
-      async (time: number, _tolerance?: number) => {
-        if (isNaN(time)) {
-          throw new Error('Specified time is not a number');
-        }
-        if (!nativeRef.current) {
-          console.warn('Video Component is not mounted');
-          return;
-        }
-        time = Math.max(0, Math.min(time, nativeRef.current.duration));
-        nativeRef.current.currentTime = time;
-        onSeek?.({seekTime: time, currentTime: nativeRef.current.currentTime});
+      (time: number, _tolerance?: number) => {
+        actionQueue.current.enqueue(async () => {
+          if (isNaN(time)) {
+            throw new Error('Specified time is not a number');
+          }
+          if (!nativeRef.current) {
+            console.warn('Video Component is not mounted');
+            return;
+          }
+          time = Math.max(0, Math.min(time, nativeRef.current.duration));
+          nativeRef.current.currentTime = time;
+          onSeek?.({
+            seekTime: time,
+            currentTime: nativeRef.current.currentTime,
+          });
+        });
       },
       [onSeek],
     );
 
     const pause = useCallback(() => {
-      if (!nativeRef.current) {
-        return;
-      }
-      nativeRef.current.pause();
+      actionQueue.current.enqueue(async () => {
+        if (!nativeRef.current) {
+          return;
+        }
+        await nativeRef.current.pause();
+      });
     }, []);
 
     const resume = useCallback(() => {
-      if (!nativeRef.current) {
-        return;
-      }
-      nativeRef.current.play();
+      actionQueue.current.enqueue(async () => {
+        if (!nativeRef.current) {
+          return;
+        }
+        try {
+          await nativeRef.current.play();
+        } catch (e) {
+          console.error('Error playing video:', e);
+        }
+      });
     }, []);
 
     const setVolume = useCallback((vol: number) => {
-      if (!nativeRef.current) {
-        return;
-      }
-      nativeRef.current.volume = Math.max(0, Math.min(vol, 100)) / 100;
+      actionQueue.current.enqueue(async () => {
+        if (!nativeRef.current) {
+          return;
+        }
+        nativeRef.current.volume = Math.max(0, Math.min(vol, 100)) / 100;
+      });
     }, []);
 
     const getCurrentPosition = useCallback(async () => {
@@ -219,6 +265,7 @@ const Video = forwardRef<VideoRef, ReactVideoProps>(
         resume();
       }
     }, [paused, pause, resume]);
+
     useEffect(() => {
       if (volume === undefined) {
         return;
@@ -253,59 +300,92 @@ const Video = forwardRef<VideoRef, ReactVideoProps>(
       nativeRef.current.playbackRate = rate;
     }, [rate]);
 
-
     const makeNewShaka = useCallback(() => {
-      if (shakaPlayerRef.current) {
-        shakaPlayerRef.current.unload()
-      }
-      shakaPlayerRef.current = new shaka.Player();
+      actionQueue.current.enqueue(async () => {
+        if (!nativeRef.current) {
+          console.warn('No video element to attach Shaka Player');
+          return;
+        }
 
+        // Pause the video before changing the source
+        await nativeRef.current.pause();
 
-      if (source?.cropStart) {
-        shakaPlayerRef.current.configure({playRangeStart: source?.cropStart / 1000})
-      }
-      if (source?.cropEnd) {
-        shakaPlayerRef.current.configure({playRangeEnd: source?.cropEnd / 1000})
-      }
+        // Unload the previous Shaka player if it exists
+        if (shakaPlayerRef.current) {
+          await shakaPlayerRef.current.unload();
+          shakaPlayerRef.current = null;
+        }
 
-      //@ts-ignore
-      shakaPlayerRef.current.addEventListener("error", (event) => {
-        //@ts-ignore
-        const shakaError = event.detail;
-        console.error('Shaka Player Error', shakaError);
-        onError?.({
-          error: {
-            errorString: shakaError.message,
-            code: shakaError.code,
-          },
+        // Create a new Shaka player and attach it to the video element
+        shakaPlayerRef.current = new shaka.Player(nativeRef.current);
+
+        if (source?.cropStart) {
+          shakaPlayerRef.current.configure({
+            playRangeStart: source?.cropStart / 1000,
+          });
+        }
+        if (source?.cropEnd) {
+          shakaPlayerRef.current.configure({
+            playRangeEnd: source?.cropEnd / 1000,
+          });
+        }
+
+        shakaPlayerRef.current.addEventListener('error', event => {
+          const shakaError = event.detail;
+          console.error('Shaka Player Error', shakaError);
+          onError?.({
+            error: {
+              errorString: shakaError.message,
+              code: shakaError.code,
+            },
+          });
         });
+
+        console.log('Initializing and attaching shaka');
+
+        // Load the new source
+        try {
+          await shakaPlayerRef.current.load(source?.uri);
+          console.log(`${source?.uri} finished loading`);
+
+          // Optionally resume playback if not paused
+          if (!paused) {
+            try {
+              await nativeRef.current.play();
+            } catch (e) {
+              console.error('Error playing video:', e);
+            }
+          }
+        } catch (e) {
+          console.error('Error loading video with Shaka Player', e);
+          onError?.({
+            error: {
+              errorString: e.message,
+              code: e.code,
+            },
+          });
+        }
       });
+    }, [source, paused, onError]);
 
-      console.log("Initializing and attaching shaka")
-      //@ts-ignore
-      shakaPlayerRef.current.attach(nativeRef.current);
-
-      //@ts-ignore
-      shakaPlayerRef.current.load(source?.uri).then(
-        () => console.log(`${source?.uri} finished loading`)
-      );
-      console.log("Started shaka loading");
-    }, [source, setCurrentSource]);
-
-    const nativeRefDefined = nativeRef.current ? true : false;
+    const nativeRefDefined = !!nativeRef.current;
 
     useEffect(() => {
       if (!nativeRef.current) {
-        console.log("Not starting shaka yet bc undefined")
+        console.log('Not starting shaka yet because video element is undefined');
         return;
       }
       if (!shallowEqual(source, currentSource)) {
-        console.log("Making new shaka, Old source: ", currentSource, "New source", source);
-        //@ts-ignore
+        console.log(
+          'Making new shaka, Old source: ',
+          currentSource,
+          'New source',
+          source,
+        );
         setCurrentSource(source);
-        makeNewShaka()
+        makeNewShaka();
       }
-    }, [source, nativeRefDefined, currentSource])
+    }, [source, nativeRefDefined, currentSource, makeNewShaka]);
 
     useMediaSession(source?.metadata, nativeRef, showNotificationControls);
 
