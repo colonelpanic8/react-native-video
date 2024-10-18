@@ -4,6 +4,7 @@ import React, {
   useEffect,
   useImperativeHandle,
   useRef,
+  useState,
   type RefObject,
 } from 'react';
 //@ts-ignore
@@ -40,6 +41,7 @@ const Video = forwardRef<VideoRef, ReactVideoProps>(
   ) => {
     const nativeRef = useRef<HTMLVideoElement>(null);
     const shakaPlayerRef = useRef<shaka.Player | null>(null);
+    const [ currentSource, setCurrentSource ] = useState<string | null>(null);
 
     const isSeeking = useRef(false);
     const seek = useCallback(
@@ -228,16 +230,28 @@ const Video = forwardRef<VideoRef, ReactVideoProps>(
       nativeRef.current.playbackRate = rate;
     }, [rate]);
 
-    useEffect(() => {
-      if (!nativeRef.current) {
-        console.log("Not starting shaka yet bc undefined")
-        return;
-      }
+
+    const makeNewShaka = useCallback(() => {
       if (shakaPlayerRef.current) {
         shakaPlayerRef.current.unload()
       }
       shakaPlayerRef.current = new shaka.Player();
+
+
+      if (source?.cropStart) {
+        shakaPlayerRef.current.configure({playRangeStart: source?.cropStart / 1000})
+      }
+      if (source?.cropEnd) {
+        shakaPlayerRef.current.configure({playRangeEnd: source?.cropEnd / 1000})
+      }
+      if (source?.cropStart) {
+        shakaPlayerRef.current.configure({playRangeStart: source?.cropStart / 1000})
+      }
+      if (source?.cropEnd) {
+        shakaPlayerRef.current.configure({playRangeEnd: source?.cropEnd / 1000})
+      }
       //@ts-ignore
+      setCurrentSource(source);
       shakaPlayerRef.current.addEventListener("error", (event) => {
         //@ts-ignore
         const shakaError = event.detail;
@@ -250,14 +264,28 @@ const Video = forwardRef<VideoRef, ReactVideoProps>(
         });
       });
       console.log("Initializing and attaching shaka")
-      shakaPlayerRef.current.attach(nativeRef.current, true);
+      //@ts-ignore
+      shakaPlayerRef.current.attach(nativeRef.current);
 
       //@ts-ignore
       shakaPlayerRef.current.load(source?.uri).then(
         () => console.log(`${source?.uri} finished loading`)
       );
       console.log("Started shaka loading");
-    }, [source, nativeRef.current])
+    }, [source, setCurrentSource]);
+
+    const nativeRefDefined = nativeRef.current ? true : false;
+
+    useEffect(() => {
+      if (!nativeRef.current) {
+        console.log("Not starting shaka yet bc undefined")
+        return;
+      }
+      if (source !== currentSource) {
+        console.log("Making new shaka, Old source: ", currentSource, "New source", source);
+        makeNewShaka()
+      }
+    }, [source, nativeRefDefined, currentSource])
 
     useMediaSession(source?.metadata, nativeRef, showNotificationControls);
 
