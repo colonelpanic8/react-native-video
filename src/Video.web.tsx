@@ -41,7 +41,7 @@ const Video = forwardRef<VideoRef, ReactVideoProps>(
   ) => {
     const nativeRef = useRef<HTMLVideoElement>(null);
     const shakaPlayerRef = useRef<shaka.Player | null>(null);
-    const [ currentSource, setCurrentSource ] = useState<string | null>(null);
+    const [ currentSource, setCurrentSource ] = useState<object | null>(null);
 
     const isSeeking = useRef(false);
     const seek = useCallback(
@@ -250,6 +250,7 @@ const Video = forwardRef<VideoRef, ReactVideoProps>(
       if (source?.cropEnd) {
         shakaPlayerRef.current.configure({playRangeEnd: source?.cropEnd / 1000})
       }
+      //@ts-ignore
       setCurrentSource(source);
       //@ts-ignore
       shakaPlayerRef.current.addEventListener("error", (event) => {
