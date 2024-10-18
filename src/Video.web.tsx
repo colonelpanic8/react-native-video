@@ -13,11 +13,11 @@ import type {VideoRef, ReactVideoProps, VideoMetadata} from './types';
 
 // Action Queue Class
 class ActionQueue {
-  private queue: (() => Promise<void>)[] = [];
+  private queue: { action: () => Promise<void>; name: string }[] = [];
   private isRunning = false;
 
-  enqueue(action: () => Promise<void>) {
-    this.queue.push(action);
+  enqueue(action: () => Promise<void>, name: string) {
+    this.queue.push({ action, name });
     this.runNext();
   }
 
@@ -27,17 +27,21 @@ class ActionQueue {
       return;
     }
     this.isRunning = true;
-    console.log("Running an action");
-    const action = this.queue.shift();
-    if (action) {
-      try {
-        await action();
-      } catch (e) {
-        console.error('Error in queued action:', e);
-      } finally {
-        this.isRunning = false;
-        this.runNext();
-      }
+    const { action, name } = this.queue.shift()!;
+    console.log(`Running action: ${name}`);
+
+    const actionPromise = action();
+    const timeoutPromise = new Promise<void>((_, reject) =>
+      setTimeout(() => reject(new Error(`Action ${name} timed out`)), 2000)
+    );
+
+    try {
+      await Promise.race([actionPromise, timeoutPromise]);
+    } catch (e) {
+      console.error('Error in queued action:', e);
+    } finally {
+      this.isRunning = false;
+      this.runNext();
     }
   }
 }
@@ -116,7 +120,7 @@ const Video = forwardRef<VideoRef, ReactVideoProps>(
             seekTime: time,
             currentTime: nativeRef.current.currentTime,
           });
-        });
+        }, 'seek');
       },
       [onSeek],
     );
@@ -127,7 +131,7 @@ const Video = forwardRef<VideoRef, ReactVideoProps>(
           return;
         }
         await nativeRef.current.pause();
-      });
+      }, 'pause');
     }, []);
 
     const resume = useCallback(() => {
@@ -140,7 +144,7 @@ const Video = forwardRef<VideoRef, ReactVideoProps>(
         } catch (e) {
           console.error('Error playing video:', e);
         }
-      });
+      }, 'resume');
     }, []);
 
     const setVolume = useCallback((vol: number) => {
@@ -149,7 +153,7 @@ const Video = forwardRef<VideoRef, ReactVideoProps>(
           return;
         }
         nativeRef.current.volume = Math.max(0, Math.min(vol, 100)) / 100;
-      });
+      }, 'setVolume');
     }, []);
 
     const getCurrentPosition = useCallback(async () => {
@@ -204,7 +208,7 @@ const Video = forwardRef<VideoRef, ReactVideoProps>(
             console.error('Could not toggle fullscreen/screen lock status', e);
           }
         };
-        run();
+        actionQueue.current.enqueue(run, 'setFullScreen');
       },
       [],
     );
@@ -374,7 +378,7 @@ const Video = forwardRef<VideoRef, ReactVideoProps>(
             },
           });
         }
-      });
+      }, 'makeNewShaka');
     }, [source, paused, onError]);
 
     const nativeRefDefined = !!nativeRef.current;
