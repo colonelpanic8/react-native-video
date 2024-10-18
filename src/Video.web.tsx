@@ -316,7 +316,7 @@ const Video = forwardRef<VideoRef, ReactVideoProps>(
         }
 
         // Pause the video before changing the source
-        await nativeRef.current.pause();
+        nativeRef.current.pause();
 
         // Unload the previous Shaka player if it exists
         if (shakaPlayerRef.current) {
@@ -325,7 +325,9 @@ const Video = forwardRef<VideoRef, ReactVideoProps>(
         }
 
         // Create a new Shaka player and attach it to the video element
-        shakaPlayerRef.current = new shaka.Player(nativeRef.current);
+        shakaPlayerRef.current = new shaka.Player();
+
+        shakaPlayerRef.current.attach(nativeRef.current);
 
         if (source?.cropStart) {
           shakaPlayerRef.current.configure({
@@ -403,6 +405,8 @@ const Video = forwardRef<VideoRef, ReactVideoProps>(
 
     useMediaSession(source?.metadata, nativeRef, showNotificationControls);
 
+    const cropStartSeconds = (source?.cropStart || 0) / 1000;
+
     return (
       <video
         ref={nativeRef}
@@ -445,7 +449,7 @@ const Video = forwardRef<VideoRef, ReactVideoProps>(
             return;
           }
           onProgress?.({
-            currentTime: nativeRef.current.currentTime,
+            currentTime: nativeRef.current.currentTime - cropStartSeconds,
             playableDuration: nativeRef.current.buffered.length
               ? nativeRef.current.buffered.end(
                   nativeRef.current.buffered.length - 1,
