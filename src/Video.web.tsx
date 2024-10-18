@@ -11,6 +11,29 @@ import React, {
 import shaka from 'shaka-player';
 import type {VideoRef, ReactVideoProps, VideoMetadata} from './types';
 
+function shallowEqual(obj1: any, obj2: any) {
+  // If both are strictly equal (covers primitive types and identical object references)
+  if (obj1 === obj2) return true;
+
+  // If one is not an object (meaning it's a primitive), they must be strictly equal
+  if (typeof obj1 !== 'object' || typeof obj2 !== 'object' || obj1 === null || obj2 === null) {
+    return false;
+  }
+
+  // Get the keys of both objects
+  const keys1 = Object.keys(obj1);
+  const keys2 = Object.keys(obj2);
+
+  // If the number of keys is different, the objects are not equal
+  if (keys1.length !== keys2.length) return false;
+
+  // Check that all keys and their corresponding values are the same
+  return keys1.every(key => {
+    // If the value is an object, we fall back to reference equality (shallow comparison)
+    return obj1[key] === obj2[key];
+  });
+}
+
 const Video = forwardRef<VideoRef, ReactVideoProps>(
   (
     {
@@ -282,7 +305,7 @@ const Video = forwardRef<VideoRef, ReactVideoProps>(
         console.log("Not starting shaka yet bc undefined")
         return;
       }
-      if (source !== currentSource) {
+        if (!shallowEqual(source, currentSource)) {
         console.log("Making new shaka, Old source: ", currentSource, "New source", source);
         makeNewShaka()
       }
