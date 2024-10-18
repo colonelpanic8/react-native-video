@@ -330,7 +330,9 @@ const Video = forwardRef<VideoRef, ReactVideoProps>(
           });
         }
 
+        //@ts-ignore
         shakaPlayerRef.current.addEventListener('error', event => {
+          //@ts-ignore
           const shakaError = event.detail;
           console.error('Shaka Player Error', shakaError);
           onError?.({
@@ -345,6 +347,7 @@ const Video = forwardRef<VideoRef, ReactVideoProps>(
 
         // Load the new source
         try {
+          //@ts-ignore
           await shakaPlayerRef.current.load(source?.uri);
           console.log(`${source?.uri} finished loading`);
 
@@ -360,7 +363,9 @@ const Video = forwardRef<VideoRef, ReactVideoProps>(
           console.error('Error loading video with Shaka Player', e);
           onError?.({
             error: {
+              //@ts-ignore
               errorString: e.message,
+              //@ts-ignore
               code: e.code,
             },
           });
@@ -382,6 +387,7 @@ const Video = forwardRef<VideoRef, ReactVideoProps>(
           'New source',
           source,
         );
+        //@ts-ignore
         setCurrentSource(source);
         makeNewShaka();
       }
