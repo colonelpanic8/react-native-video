@@ -301,7 +301,9 @@ const Video = forwardRef<VideoRef, ReactVideoProps>(
     }, [rate]);
 
     const makeNewShaka = useCallback(() => {
+      console.log("makeNewShaka");
       actionQueue.current.enqueue(async () => {
+        console.log("makeNewShaka actionQueue");
         if (!nativeRef.current) {
           console.warn('No video element to attach Shaka Player');
           return;
