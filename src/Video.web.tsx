@@ -250,8 +250,8 @@ const Video = forwardRef<VideoRef, ReactVideoProps>(
       if (source?.cropEnd) {
         shakaPlayerRef.current.configure({playRangeEnd: source?.cropEnd / 1000})
       }
-      //@ts-ignore
       setCurrentSource(source);
+      //@ts-ignore
       shakaPlayerRef.current.addEventListener("error", (event) => {
         //@ts-ignore
         const shakaError = event.detail;
