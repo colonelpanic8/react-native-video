@@ -267,14 +267,7 @@ const Video = forwardRef<VideoRef, ReactVideoProps>(
       if (source?.cropEnd) {
         shakaPlayerRef.current.configure({playRangeEnd: source?.cropEnd / 1000})
       }
-      if (source?.cropStart) {
-        shakaPlayerRef.current.configure({playRangeStart: source?.cropStart / 1000})
-      }
-      if (source?.cropEnd) {
-        shakaPlayerRef.current.configure({playRangeEnd: source?.cropEnd / 1000})
-      }
-      //@ts-ignore
-      setCurrentSource(source);
+
       //@ts-ignore
       shakaPlayerRef.current.addEventListener("error", (event) => {
         //@ts-ignore
@@ -287,6 +280,7 @@ const Video = forwardRef<VideoRef, ReactVideoProps>(
           },
         });
       });
+
       console.log("Initializing and attaching shaka")
       //@ts-ignore
       shakaPlayerRef.current.attach(nativeRef.current);
@@ -305,8 +299,10 @@ const Video = forwardRef<VideoRef, ReactVideoProps>(
         console.log("Not starting shaka yet bc undefined")
         return;
       }
-        if (!shallowEqual(source, currentSource)) {
+      if (!shallowEqual(source, currentSource)) {
         console.log("Making new shaka, Old source: ", currentSource, "New source", source);
+        //@ts-ignore
+        setCurrentSource(source);
         makeNewShaka()
       }
     }, [source, nativeRefDefined, currentSource])
