@@ -1,4 +1,5 @@
 import type {RefObject} from 'react';
+import {ReactVideoSource} from './video';
 
 export type VideoSaveData = {
   uri: string;
@@ -13,9 +14,10 @@ export interface VideoRef {
   restoreUserInterfaceForPictureInPictureStopCompleted: (
     restore: boolean,
   ) => void;
-  save: (options: object) => Promise<VideoSaveData>;
+  save: (options: object) => Promise<VideoSaveData> | void;
   setVolume: (volume: number) => void;
   getCurrentPosition: () => Promise<number>;
   setFullScreen: (fullScreen: boolean) => void;
+  setSource: (source?: ReactVideoSource) => void;
   nativeHtmlVideoRef?: RefObject<HTMLVideoElement>; // web only
 }

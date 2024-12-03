@@ -30,6 +30,12 @@ class Source {
     /** Parsed value of source to playback */
     var uri: Uri? = null
 
+    /** True if source is a local JS asset */
+    var isLocalAssetFile: Boolean = false
+
+    /** True if source is a local file asset://, ... */
+    var isAsset: Boolean = false
+
     /** Start position of playback used to resume playback */
     var startPositionMs: Int = -1
 
@@ -47,6 +53,9 @@ class Source {
 
     /** Metadata to display in notification */
     var metadata: Metadata? = null
+
+    /** Allowed reload before failure notification */
+    var minLoadRetryCount = 3
 
     /** http header list */
     val headers: MutableMap<String, String> = HashMap()
@@ -71,6 +80,11 @@ class Source {
      */
     var adsProps: AdsProps? = null
 
+    /*
+     * buffering configuration
+     */
+    var bufferConfig = BufferConfig()
+
     /**
      * The list of sideLoaded text tracks
      */
@@ -91,7 +105,11 @@ class Source {
                 contentStartTime == other.contentStartTime &&
                 cmcdProps == other.cmcdProps &&
                 sideLoadedTextTracks == other.sideLoadedTextTracks &&
-                adsProps == other.adsProps
+                adsProps == other.adsProps &&
+                minLoadRetryCount == other.minLoadRetryCount &&
+                isLocalAssetFile == other.isLocalAssetFile &&
+                isAsset == other.isAsset &&
+                bufferConfig == other.bufferConfig
             )
     }
 
@@ -147,6 +165,8 @@ class Source {
     companion object {
         private const val TAG = "Source"
         private const val PROP_SRC_URI = "uri"
+        private const val PROP_SRC_IS_LOCAL_ASSET_FILE = "isLocalAssetFile"
+        private const val PROP_SRC_IS_ASSET = "isAsset"
         private const val PROP_SRC_START_POSITION = "startPosition"
         private const val PROP_SRC_CROP_START = "cropStart"
         private const val PROP_SRC_CROP_END = "cropEnd"
@@ -159,6 +179,8 @@ class Source {
         private const val PROP_SRC_ADS = "ad"
         private const val PROP_SRC_TEXT_TRACKS_ALLOW_CHUNKLESS_PREPARATION = "textTracksAllowChunklessPreparation"
         private const val PROP_SRC_TEXT_TRACKS = "textTracks"
+        private const val PROP_SRC_MIN_LOAD_RETRY_COUNT = "minLoadRetryCount"
+        private const val PROP_SRC_BUFFER_CONFIG = "bufferConfig"
 
         @SuppressLint("DiscouragedApi")
         private fun getUriFromAssetId(context: Context, uriString: String): Uri? {
@@ -211,6 +233,8 @@ class Source {
                 }
                 source.uriString = uriString
                 source.uri = uri
+                source.isLocalAssetFile = safeGetBool(src, PROP_SRC_IS_LOCAL_ASSET_FILE, false)
+                source.isAsset = safeGetBool(src, PROP_SRC_IS_ASSET, false)
                 source.startPositionMs = safeGetInt(src, PROP_SRC_START_POSITION, -1)
                 source.cropStartMs = safeGetInt(src, PROP_SRC_CROP_START, -1)
                 source.cropEndMs = safeGetInt(src, PROP_SRC_CROP_END, -1)
@@ -223,6 +247,8 @@ class Source {
                 }
                 source.textTracksAllowChunklessPreparation = safeGetBool(src, PROP_SRC_TEXT_TRACKS_ALLOW_CHUNKLESS_PREPARATION, true)
                 source.sideLoadedTextTracks = SideLoadedTextTrackList.parse(safeGetArray(src, PROP_SRC_TEXT_TRACKS))
+                source.minLoadRetryCount = safeGetInt(src, PROP_SRC_MIN_LOAD_RETRY_COUNT, 3)
+                source.bufferConfig = BufferConfig.parse(safeGetMap(src, PROP_SRC_BUFFER_CONFIG))
 
                 val propSrcHeadersArray = safeGetArray(src, PROP_SRC_HEADERS)
                 if (propSrcHeadersArray != null) {

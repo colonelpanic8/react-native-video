@@ -46,7 +46,7 @@ import {
   resolveAssetSourceForVideo,
 } from './utils';
 import NativeVideoManager from './specs/NativeVideoManager';
-import {type VideoSaveData, CmcdMode, ViewType} from './types';
+import {type VideoSaveData, ViewType, CmcdMode, VideoRef} from './types';
 import type {
   OnLoadData,
   OnTextTracksData,
@@ -55,22 +55,6 @@ import type {
   CmcdData,
   ReactVideoSource,
 } from './types';
-
-export interface VideoRef {
-  seek: (time: number, tolerance?: number) => void;
-  resume: () => void;
-  pause: () => void;
-  presentFullscreenPlayer: () => void;
-  dismissFullscreenPlayer: () => void;
-  restoreUserInterfaceForPictureInPictureStopCompleted: (
-    restore: boolean,
-  ) => void;
-  setVolume: (volume: number) => void;
-  setFullScreen: (fullScreen: boolean) => void;
-  setSource: (source?: ReactVideoSource) => void;
-  save: (options: object) => Promise<VideoSaveData> | void;
-  getCurrentPosition: () => Promise<number>;
-}
 
 const Video = forwardRef<VideoRef, ReactVideoProps>(
   (
@@ -125,6 +109,8 @@ const Video = forwardRef<VideoRef, ReactVideoProps>(
       onVideoTracks,
       onAspectRatio,
       localSourceEncryptionKeyScheme,
+      minLoadRetryCount,
+      bufferConfig,
       ...rest
     },
     ref,
@@ -167,6 +153,11 @@ const Video = forwardRef<VideoRef, ReactVideoProps>(
         if (!_source) {
           return undefined;
         }
+
+        const isLocalAssetFile =
+          typeof _source === 'number' ||
+          ('uri' in _source && typeof _source.uri === 'number');
+
         const resolvedSource = resolveAssetSourceForVideo(_source);
         let uri = resolvedSource.uri || '';
         if (uri && uri.match(/^\//)) {
@@ -234,10 +225,15 @@ const Video = forwardRef<VideoRef, ReactVideoProps>(
             ? {adTagUrl: adTagUrl, adLanguage: adLanguage}
             : undefined);
 
+        const _minLoadRetryCount =
+          _source.minLoadRetryCount || minLoadRetryCount;
+
+        const _bufferConfig = _source.bufferConfig || bufferConfig;
         return {
           uri,
           isNetwork,
           isAsset,
+          isLocalAssetFile,
           shouldCache: resolvedSource.shouldCache || false,
           type: resolvedSource.type || '',
           mainVer: resolvedSource.mainVer || 0,
@@ -254,6 +250,8 @@ const Video = forwardRef<VideoRef, ReactVideoProps>(
           textTracks: _textTracks,
           textTracksAllowChunklessPreparation:
             resolvedSource.textTracksAllowChunklessPreparation,
+          minLoadRetryCount: _minLoadRetryCount,
+          bufferConfig: _bufferConfig,
         };
       },
       [
@@ -262,8 +260,10 @@ const Video = forwardRef<VideoRef, ReactVideoProps>(
         contentStartTime,
         drm,
         localSourceEncryptionKeyScheme,
+        minLoadRetryCount,
         source?.cmcd,
         textTracks,
+        bufferConfig,
       ],
     );
 
@@ -788,9 +788,8 @@ const Video = forwardRef<VideoRef, ReactVideoProps>(
     const _style: StyleProp<ViewStyle> = useMemo(
       () => ({
         ...StyleSheet.absoluteFillObject,
-        ...(showPoster ? {display: 'none'} : {}),
       }),
-      [showPoster],
+      [],
     );
 
     return (

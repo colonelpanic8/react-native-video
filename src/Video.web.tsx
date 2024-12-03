@@ -4,70 +4,26 @@ import React, {
   useEffect,
   useImperativeHandle,
   useRef,
-  useState,
   type RefObject,
+  useState,
 } from 'react';
-//@ts-ignore
-import shaka from 'shaka-player';
 import type {VideoRef, ReactVideoProps, VideoMetadata} from './types';
 
-// Action Queue Class
-class ActionQueue {
-  private queue: { action: () => Promise<void>; name: string }[] = [];
-  private isRunning = false;
-
-  enqueue(action: () => Promise<void>, name: string) {
-    this.queue.push({ action, name });
-    this.runNext();
+// stolen from https://stackoverflow.com/a/77278013/21726244
+const isDeepEqual = <T,>(a: T, b: T): boolean => {
+  if (a === b) {
+    return true;
   }
 
-  private async runNext() {
-    if (this.isRunning || this.queue.length === 0) {
-      console.log("Refusing to run in runNext", this.queue.length, this.isRunning);
-      return;
-    }
-    this.isRunning = true;
-    const { action, name } = this.queue.shift()!;
-    console.log(`Running action: ${name}`);
+  const bothAreObjects =
+    a && b && typeof a === 'object' && typeof b === 'object';
 
-    const actionPromise = action();
-    const timeoutPromise = new Promise<void>((_, reject) =>
-      setTimeout(() => reject(new Error(`Action ${name} timed out`)), 2000)
-    );
-
-    try {
-      await Promise.race([actionPromise, timeoutPromise]);
-    } catch (e) {
-      console.error('Error in queued action:', e);
-    } finally {
-      this.isRunning = false;
-      this.runNext();
-    }
-  }
-}
-
-function shallowEqual(obj1: any, obj2: any) {
-  // If both are strictly equal (covers primitive types and identical object references)
-  if (obj1 === obj2) return true;
-
-  // If one is not an object (meaning it's a primitive), they must be strictly equal
-  if (typeof obj1 !== 'object' || typeof obj2 !== 'object' || obj1 === null || obj2 === null) {
-    return false;
-  }
-
-  // Get the keys of both objects
-  const keys1 = Object.keys(obj1);
-  const keys2 = Object.keys(obj2);
-
-  // If the number of keys is different, the objects are not equal
-  if (keys1.length !== keys2.length) return false;
-
-  // Check that all keys and their corresponding values are the same
-  return keys1.every(key => {
-    // If the value is an object, we fall back to reference equality (shallow comparison)
-    return obj1[key] === obj2[key];
-  });
-}
+  return Boolean(
+    bothAreObjects &&
+      Object.keys(a).length === Object.keys(b).length &&
+      Object.entries(a).every(([k, v]) => isDeepEqual(v, b[k as keyof T])),
+  );
+};
 
 const Video = forwardRef<VideoRef, ReactVideoProps>(
   (
@@ -98,62 +54,53 @@ const Video = forwardRef<VideoRef, ReactVideoProps>(
     ref,
   ) => {
     const nativeRef = useRef<HTMLVideoElement>(null);
-    const shakaPlayerRef = useRef<shaka.Player | null>(null);
-    const [currentSource, setCurrentSource] = useState<object | null>(null);
-    const actionQueue = useRef(new ActionQueue());
 
     const isSeeking = useRef(false);
-
     const seek = useCallback(
-      (time: number, _tolerance?: number) => {
-        actionQueue.current.enqueue(async () => {
-          if (isNaN(time)) {
-            throw new Error('Specified time is not a number');
-          }
-          if (!nativeRef.current) {
-            console.warn('Video Component is not mounted');
-            return;
-          }
-          time = Math.max(0, Math.min(time, nativeRef.current.duration));
-          nativeRef.current.currentTime = time;
-          onSeek?.({
-            seekTime: time,
-            currentTime: nativeRef.current.currentTime,
-          });
-        }, 'seek');
+      async (time: number, _tolerance?: number) => {
+        if (isNaN(time)) {
+          throw new Error('Specified time is not a number');
+        }
+        if (!nativeRef.current) {
+          console.warn('Video Component is not mounted');
+          return;
+        }
+        time = Math.max(0, Math.min(time, nativeRef.current.duration));
+        nativeRef.current.currentTime = time;
+        onSeek?.({seekTime: time, currentTime: nativeRef.current.currentTime});
       },
       [onSeek],
     );
 
+    const [src, setSource] = useState(source);
+    const currentSourceProp = useRef(source);
+    useEffect(() => {
+      if (isDeepEqual(source, currentSourceProp.current)) {
+        return;
+      }
+      currentSourceProp.current = source;
+      setSource(source);
+    }, [source]);
+
     const pause = useCallback(() => {
-      actionQueue.current.enqueue(async () => {
-        if (!nativeRef.current) {
-          return;
-        }
-        await nativeRef.current.pause();
-      }, 'pause');
+      if (!nativeRef.current) {
+        return;
+      }
+      nativeRef.current.pause();
     }, []);
 
     const resume = useCallback(() => {
-      actionQueue.current.enqueue(async () => {
-        if (!nativeRef.current) {
-          return;
-        }
-        try {
-          await nativeRef.current.play();
-        } catch (e) {
-          console.error('Error playing video:', e);
-        }
-      }, 'resume');
+      if (!nativeRef.current) {
+        return;
+      }
+      nativeRef.current.play();
     }, []);
 
     const setVolume = useCallback((vol: number) => {
-      actionQueue.current.enqueue(async () => {
-        if (!nativeRef.current) {
-          return;
-        }
-        nativeRef.current.volume = Math.max(0, Math.min(vol, 100)) / 100;
-      }, 'setVolume');
+      if (!nativeRef.current) {
+        return;
+      }
+      nativeRef.current.volume = Math.max(0, Math.min(vol, 100)) / 100;
     }, []);
 
     const getCurrentPosition = useCallback(async () => {
@@ -176,8 +123,9 @@ const Video = forwardRef<VideoRef, ReactVideoProps>(
       fullscreenOrientation,
       fullscreenAutorotate,
     };
+
     const setFullScreen = useCallback(
-      (
+      async (
         newVal: boolean,
         orientation?: ReactVideoProps['fullscreenOrientation'],
         autorotate?: boolean,
@@ -185,30 +133,27 @@ const Video = forwardRef<VideoRef, ReactVideoProps>(
         orientation ??= fsPrefs.current.fullscreenOrientation;
         autorotate ??= fsPrefs.current.fullscreenAutorotate;
 
-        const run = async () => {
-          try {
-            if (newVal) {
-              await nativeRef.current?.requestFullscreen({
-                navigationUI: 'hide',
-              });
-              if (orientation === 'all' || !orientation || autorotate) {
-                screen.orientation.unlock();
-              } else {
-                await screen.orientation.lock(orientation);
-              }
-            } else {
-              if (document.fullscreenElement) {
-                await document.exitFullscreen();
-              }
+        try {
+          if (newVal) {
+            await nativeRef.current?.requestFullscreen({
+              navigationUI: 'hide',
+            });
+            if (orientation === 'all' || !orientation || autorotate) {
               screen.orientation.unlock();
+            } else {
+              await screen.orientation.lock(orientation);
             }
-          } catch (e) {
-            // Changing fullscreen status without a button click is not allowed so it throws.
-            // Some browsers also used to throw when locking screen orientation was not supported.
-            console.error('Could not toggle fullscreen/screen lock status', e);
+          } else {
+            if (document.fullscreenElement) {
+              await document.exitFullscreen();
+            }
+            screen.orientation.unlock();
           }
-        };
-        actionQueue.current.enqueue(run, 'setFullScreen');
+        } catch (e) {
+          // Changing fullscreen status without a button click is not allowed so it throws.
+          // Some browsers also used to throw when locking screen orientation was not supported.
+          console.error('Could not toggle fullscreen/screen lock status', e);
+        }
       },
       [],
     );
@@ -239,6 +184,7 @@ const Video = forwardRef<VideoRef, ReactVideoProps>(
       ref,
       () => ({
         seek,
+        setSource,
         pause,
         resume,
         setVolume,
@@ -252,6 +198,7 @@ const Video = forwardRef<VideoRef, ReactVideoProps>(
       }),
       [
         seek,
+        setSource,
         pause,
         resume,
         unsupported,
@@ -271,9 +218,8 @@ const Video = forwardRef<VideoRef, ReactVideoProps>(
         resume();
       }
     }, [paused, pause, resume]);
-
     useEffect(() => {
-      if (volume === undefined) {
+      if (volume === undefined || isNaN(volume)) {
         return;
       }
       setVolume(volume);
@@ -291,7 +237,7 @@ const Video = forwardRef<VideoRef, ReactVideoProps>(
 
         // Set play state to the player's value (if autoplay is denied)
         // This is useful if our UI is in a play state but autoplay got denied so
-        // the video is actaully in a paused state.
+        // the video is actually in a paused state.
         playbackStateRef.current?.({
           isPlaying: !nativeRef.current.paused,
           isSeeking: isSeeking.current,
@@ -306,117 +252,24 @@ const Video = forwardRef<VideoRef, ReactVideoProps>(
       nativeRef.current.playbackRate = rate;
     }, [rate]);
 
-    const makeNewShaka = useCallback(() => {
-      console.log("makeNewShaka");
-      actionQueue.current.enqueue(async () => {
-        console.log("makeNewShaka actionQueue");
-        if (!nativeRef.current) {
-          console.warn('No video element to attach Shaka Player');
-          return;
-        }
-
-        // Pause the video before changing the source
-        nativeRef.current.pause();
-
-        // Unload the previous Shaka player if it exists
-        if (shakaPlayerRef.current) {
-          await shakaPlayerRef.current.unload();
-          shakaPlayerRef.current = null;
-        }
-
-        // Create a new Shaka player and attach it to the video element
-        shakaPlayerRef.current = new shaka.Player();
-
-        shakaPlayerRef.current.attach(nativeRef.current);
-
-        if (source?.cropStart) {
-          shakaPlayerRef.current.configure({
-            playRangeStart: source?.cropStart / 1000,
-          });
-        }
-        if (source?.cropEnd) {
-          shakaPlayerRef.current.configure({
-            playRangeEnd: source?.cropEnd / 1000,
-          });
-        }
-
-        //@ts-ignore
-        shakaPlayerRef.current.addEventListener('error', event => {
-          //@ts-ignore
-          const shakaError = event.detail;
-          console.error('Shaka Player Error', shakaError);
-          onError?.({
-            error: {
-              errorString: shakaError.message,
-              code: shakaError.code,
-            },
-          });
-        });
-
-        console.log('Initializing and attaching shaka');
-
-        // Load the new source
-        try {
-          //@ts-ignore
-          await shakaPlayerRef.current.load(source?.uri);
-          console.log(`${source?.uri} finished loading`);
-
-          // Optionally resume playback if not paused
-          if (!paused) {
-            try {
-              await nativeRef.current.play();
-            } catch (e) {
-              console.error('Error playing video:', e);
-            }
-          }
-        } catch (e) {
-          console.error('Error loading video with Shaka Player', e);
-          onError?.({
-            error: {
-              //@ts-ignore
-              errorString: e.message,
-              //@ts-ignore
-              code: e.code,
-            },
-          });
-        }
-      }, 'makeNewShaka');
-    }, [source, paused, onError]);
-
-    const nativeRefDefined = !!nativeRef.current;
-
-    useEffect(() => {
-      if (!nativeRef.current) {
-        console.log('Not starting shaka yet because video element is undefined');
-        return;
-      }
-      if (!shallowEqual(source, currentSource)) {
-        console.log(
-          'Making new shaka, Old source: ',
-          currentSource,
-          'New source',
-          source,
-        );
-        //@ts-ignore
-        setCurrentSource(source);
-        makeNewShaka();
-      }
-    }, [source, nativeRefDefined, currentSource, makeNewShaka]);
-
-    useMediaSession(source?.metadata, nativeRef, showNotificationControls);
-
-    const cropStartSeconds = (source?.cropStart || 0) / 1000;
+    useMediaSession(src?.metadata, nativeRef, showNotificationControls);
 
     return (
       <video
         ref={nativeRef}
+        src={src?.uri as string | undefined}
         muted={muted}
         autoPlay={!paused}
         controls={controls}
         loop={repeat}
         playsInline
-        //@ts-ignore
-        poster={poster}
+        poster={
+          typeof poster === 'object'
+            ? typeof poster.source === 'object'
+              ? poster.source.uri
+              : undefined
+            : poster
+        }
         onCanPlay={() => onBuffer?.({isBuffering: false})}
         onWaiting={() => onBuffer?.({isBuffering: true})}
         onRateChange={() => {
@@ -449,7 +302,7 @@ const Video = forwardRef<VideoRef, ReactVideoProps>(
             return;
           }
           onProgress?.({
-            currentTime: nativeRef.current.currentTime - cropStartSeconds,
+            currentTime: nativeRef.current.currentTime,
             playableDuration: nativeRef.current.buffered.length
               ? nativeRef.current.buffered.end(
                   nativeRef.current.buffered.length - 1,
@@ -471,8 +324,8 @@ const Video = forwardRef<VideoRef, ReactVideoProps>(
           });
         }}
         onLoadedMetadata={() => {
-          if (source?.startPosition) {
-            seek(source.startPosition / 1000);
+          if (src?.startPosition) {
+            seek(src.startPosition / 1000);
           }
         }}
         onPlay={() =>
@@ -488,7 +341,17 @@ const Video = forwardRef<VideoRef, ReactVideoProps>(
           })
         }
         onSeeking={() => (isSeeking.current = true)}
-        onSeeked={() => (isSeeking.current = false)}
+        onSeeked={() => {
+          // only trigger this if it's from UI seek.
+          // if it was triggered via ref.seek(), onSeek has already been called
+          if (isSeeking.current) {
+            isSeeking.current = false;
+            onSeek?.({
+              seekTime: nativeRef.current!.currentTime,
+              currentTime: nativeRef.current!.currentTime,
+            });
+          }
+        }}
         onVolumeChange={() => {
           if (!nativeRef.current) {
             return;
